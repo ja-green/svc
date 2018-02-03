@@ -1,0 +1,174 @@
+#!/bin/bash
+
+PROGNAME=$(basename $0)
+SUBCMDS=(start stop list)
+SVCS=(vat-summary-frontend view-vat-returns-frontend)
+opts=":ahp:"
+  
+usage() {
+    echo -e "Usage: $PROGNAME <subcommand> [options]\n"
+    echo -e "Subcommands:"
+    echo -e "    start         Start microservice"
+    echo -e "    stop          Stop microservice"
+    echo -e "    list          List running microservices\n"
+    echo -e "Options:"
+    echo -e "    -p | --port   Specify port to run on"
+    echo -e "    -a | --all    Use all services"
+    echo -e "    -h | --help   Show this screen\n"
+    echo -e "For help with each subcommand run:"
+    echo -e "$PROGNAME <subcommand> -h | --help\n"
+    exit 1
+}
+  
+sub_start() {
+    if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
+
+    if [[ $ALL -eq 1 ]]; then
+        for NAME in "${SVCS[@]}"; do
+            if ! screen -list | grep $NAME > /dev/null ; then        
+                case $SVC in
+                "vat-summary-frontend")		PORT=9152 ;;
+                "view-vat-returns-frontend")    PORT=9151 ;;
+                esac
+
+                cd $WORKSPACE/$NAME
+                screen -d -m -S $NAME sbt "run $PORT"
+            fi
+        done
+        echo "all services started"
+        exit 0
+    fi
+
+    if screen -list | grep $SVC > /dev/null ; then
+        echo "[warn] service already running"
+        exit 0
+    fi
+
+    if [ -z "$PORT" ]; then 
+        case $SVC in
+        "vat-summary-frontend")		PORT=9152 ;;
+        "view-vat-returns-frontend")    PORT=9151 ;;
+        *)				PORT=9000 ;;
+        esac 
+    fi
+
+    cd $WORKSPACE/$SVC
+    if screen -d -m -S $SVC sbt "run $PORT" ; then
+        echo "service '$SVC' started"
+    else
+        echo "[fatal] cannot start service"
+        exit 1
+    fi
+}
+  
+sub_stop() {
+    if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
+
+    if [[ $ALL -eq 1 ]]; then
+        for NAME in "${SVCS[@]}"; do
+            if screen -list | grep $NAME > /dev/null ; then        
+                screen -X -S $NAME quit > /dev/null
+            fi
+        done
+        echo "all services stopped"
+        exit 0
+    fi
+
+    if ! screen -list | grep $SVC > /dev/null ; then
+        echo "[warn] service not running"
+        exit 1
+    fi
+
+    if screen -X -S $SVC quit > /dev/null ; then
+        echo "service '$SVC' stopped"
+    else
+        echo "[fatal] cannot stop service"
+        exit 1
+    fi
+}
+  
+sub_list() {
+    if [[ $ALL -eq 1 ]]; then
+        for NAME in "${SVCS[@]}"; do
+            if screen -list | grep $NAME > /dev/null ; then STATUS="active"
+            else STATUS="inactive"; fi
+            
+            cd $WORKSPACE/$NAME
+            BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+            printf "%-30s %-10s %s\n" $NAME $STATUS $BRANCH
+        done
+    
+    else 
+        for NAME in "${SVCS[@]}"; do
+            if screen -list | grep $NAME > /dev/null ; then 
+                STATUS="active"
+ 
+                cd $WORKSPACE/$NAME
+                BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+                printf "%-30s %-10s %s\n" $NAME $STATUS $BRANCH
+            fi
+        done
+    fi
+}
+
+no_argument() {
+    echo -e "[fatal] option '$1' requires an argument\n"
+    subcmd_usage
+}
+
+invalid_opt() {
+    echo -e "[fatal] unknown option '$1'\n"
+    subcmd_usage
+}
+
+invalid_subcmd() {
+    echo -e "[fatal] '$1' is not a known subcommand\n" >&2
+    echo -e "run '$PROGNAME --help' for a list of known subcommands." >&2
+    exit 1
+}
+
+invalid_svc() {
+    echo "[fatal] '$1' is not a known service." >&2
+    exit 1
+}
+
+subcmd_usage() {
+    echo -e "Usage: $PROGNAME $SUBCMD [options]\n"
+    echo -e "For help with each subcommand run:"              
+    echo -e "$PROGNAME <subcommand> -h | --help\n"
+    exit 1
+}
+
+if [ $# -eq 0 ]; then usage; fi
+
+for pass in 1 2; do
+    while [ -n "$1" ]; do
+        case $1 in
+            --) shift; break;;
+            -*) case $1 in
+                -p|--port)     if [ ! -z "$2" ]; then PORT=$2; else no_argument $1; fi; shift ;;
+                -h|--help)     if [ -z "$SUBCMD" ]; then usage ;  else subcmd_usage; fi ;;
+                -a|--all)      ALL=1 ;;
+                --*)           invalid_opt $1 ;;
+                -*)            if [ $pass -eq 1 ]; then ARGS="$ARGS $1";
+                               else invalid_opt $1 ; fi;;
+                esac;;
+                
+            *)  if   [[ ${SUBCMDS[*]} == *"$1"* ]]; then SUBCMD=$1
+                elif [[ ${SVCS[*]}    == *"$1"* ]]; then SVC=$1
+                elif [ -z "$SUBCMD" ];              then invalid_subcmd $1
+                elif [ -z "$SVC"    ];              then invalid_svc $1
+                else invalid_opt $1 ; fi ;;
+
+        esac
+        shift
+    done
+    if [ $pass -eq 1 ]; then ARGS=`getopt $opts $ARGS`
+        if [ $? != 0 ]; then usage; exit 2; fi; set -- $ARGS
+    fi
+done
+
+sub_$SUBCMD
+exit 0
