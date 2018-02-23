@@ -11,7 +11,7 @@ install: dep ## Install svc
 	    sudo cp svc_prompt /etc/bash_completion.d/;\
 	    sudo chmod +x /usr/local/bin/svc;\
 	    sudo chmod +x /etc/bash_completion.d/svc_prompt;\
-	    cp -r .svc $HOME;\
+	    cp -r .svc ${HOME};\
 	fi
 	
 dep: ## Get the dependencies
