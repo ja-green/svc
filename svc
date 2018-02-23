@@ -99,7 +99,7 @@ sub_start() {
         git checkout -q $BRANCH
     fi
     if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT" ; then
-        echo "[success] service '$SVC' started"
+        echo "[success] service '$SVC' started on port $PORT"
     else
         echo "[fatal] cannot start service"
         exit 1
@@ -367,6 +367,10 @@ done
 
 if [ -z "$SVC" ] && [[ $SUBCMD =~ ^(start|stop|test|utest|itest|log|clean|compile)$ ]] && [[ $ALL -eq 0 ]]; then
     get_svcname
+fi
+
+if [ -z "$SUBCMD" ]; then
+    usage
 fi
 
 sub_${SUBCMD}
