@@ -250,7 +250,11 @@ sub_populate() {
             exit 0
     	fi
 
-	sleep 10
+	remove_log
+	while [ true ]; do
+       	    if cat $LOG_DIR/vat-summary-frontend.log | grep started > /dev/null ; then break; fi
+            sleep 1
+        done
 	
 	HOST="127.0.0.1:9152"
 	
