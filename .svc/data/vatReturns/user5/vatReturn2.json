@@ -1,0 +1,17 @@
+{
+  "_id" : "/555555555/returns/17BB",
+  "method" : "GET",
+  "status" : 200,
+  "response" : {
+    "periodKey": "17BB",
+    "vatDueSales": 300.00,
+    "vatDueAcquisitions": 300.00,
+    "totalVatDue": 600,
+    "vatReclaimedCurrPeriod": 100.00,
+    "netVatDue": 500,
+    "totalValueSalesExVAT": 500,
+    "totalValuePurchasesExVAT": 500,
+    "totalValueGoodsSuppliedExVAT": 500,
+    "totalAcquisitionsExVAT": 500
+  }
+}

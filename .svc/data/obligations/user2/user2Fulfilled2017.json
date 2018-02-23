@@ -1,0 +1,8 @@
+{
+  "_id" : "/222222222/obligations?from=2017-01-01&to=2017-12-31&status=F",
+  "method" : "GET",
+  "status" : 200,
+  "response" : {
+    "obligations": []
+  }
+}

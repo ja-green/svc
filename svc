@@ -1,43 +1,85 @@
 #!/bin/bash
 
 PROGNAME=$(basename $0)
-SUBCMDS=(start stop list)
+VERSION=0.2.0
+SVC_DIR="$HOME/.svc/"
+LOG_DIR="$SVC_DIR/log/"
+CONF_DIR="$SVC_DIR/conf/"
+
+SUBCMDS=(start stop list log test utest itest clean compile populate)
 SVCS=(vat-summary-frontend view-vat-returns-frontend)
 opts=":ahp:"
-  
+
+main="Manage the running and testing of HMRC VAT:VC microservices"
+start="Start running a microservice"
+stop="Stop a running microservice"
+list="List microservices"
+log="Print service output"
+test="Run unit and integration tests"
+utest="Run unit tests"
+itest="Run integration tests"
+clean="Clean microservice files"
+compile="Compile the microservice code"
+populate="Populate the services with data"
+
 usage() {
-    echo -e "Usage: $PROGNAME <subcommand> [options]\n"
-    echo -e "Subcommands:"
-    echo -e "    start         Start microservice"
-    echo -e "    stop          Stop microservice"
-    echo -e "    list          List running microservices\n"
+    echo -e "${main}\n"
+    echo -e "Usage:"
+    echo -e "\t$PROGNAME <command> [options]"
+    echo -e "\t$PROGNAME <command> [microservice] [options]\n"
+    echo -e "Commands:"
+    echo -e "\tstart           $start"
+    echo -e "\tstop            $stop"
+    echo -e "\tlist            $list"
+    echo -e "\tlog             $log"
+    echo -e "\ttest            $test"
+    echo -e "\tutest           $utest"
+    echo -e "\titest           $itest"
+    echo -e "\tclean           $clean"
+    echo -e "\tcompile         $compile"
+    echo -e "\tpopulate        $populate\n"
     echo -e "Options:"
-    echo -e "    -p | --port   Specify port to run on"
-    echo -e "    -a | --all    Use all services"
-    echo -e "    -h | --help   Show this screen\n"
-    echo -e "For help with each subcommand run:"
-    echo -e "$PROGNAME <subcommand> -h | --help\n"
-    exit 1
+    echo -e "\t-p, --port      Specify port to use"
+    echo -e "\t-a, --all       Use all services"
+    echo -e "\t-b, --branch    Specify a git branch"
+    echo -e "\t-h, --help      Show this screen"
+    echo -e "\t-v, --version   Show version information\n"
+    echo -e "For help with each command run:"
+    echo -e "$PROGNAME <command> -h | --help\n"
+    exit 0
+}
+
+version() {
+    echo -e "$PROGNAME version $VERSION"
+    exit 0
+
 }
   
 sub_start() {
     if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
 
     if [[ $ALL -eq 1 ]]; then
-        for NAME in "${SVCS[@]}"; do
-            if ! screen -list | grep $NAME > /dev/null ; then        
+        for SVC in "${SVCS[@]}"; do
+            if ! screen -list | grep $SVC > /dev/null ; then
+                remove_log $SVC
+     
                 case $SVC in
                 "vat-summary-frontend")		PORT=9152 ;;
                 "view-vat-returns-frontend")    PORT=9151 ;;
                 esac
 
-                cd $WORKSPACE/$NAME
-                screen -d -m -S $NAME sbt "run $PORT"
+                cd $WORKSPACE/$SVC
+                if [ ! -z "$BRANCH" ] ; then
+        	    git checkout -q $BRANCH
+    		fi
+                screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT"
             fi
         done
-        echo "all services started"
+        echo "[success] all services started"
         exit 0
     fi
+
+    remove_log $SVC
 
     if screen -list | grep $SVC > /dev/null ; then
         echo "[warn] service already running"
@@ -48,16 +90,22 @@ sub_start() {
         case $SVC in
         "vat-summary-frontend")		PORT=9152 ;;
         "view-vat-returns-frontend")    PORT=9151 ;;
-        *)				PORT=9000 ;;
+        *)	                        PORT=9000 ;;
         esac 
     fi
 
     cd $WORKSPACE/$SVC
-    if screen -d -m -S $SVC sbt "run $PORT" ; then
-        echo "service '$SVC' started"
+    if [ ! -z "$BRANCH" ] ; then
+        git checkout -q $BRANCH
+    fi
+    if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT" ; then
+        echo "[success] service '$SVC' started"
     else
         echo "[fatal] cannot start service"
         exit 1
+    fi
+    if [ ! -z "$CURR_BRANCH" ] ; then
+        git checkout -q $CURR_BRANCH
     fi
 }
   
@@ -65,12 +113,12 @@ sub_stop() {
     if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
 
     if [[ $ALL -eq 1 ]]; then
-        for NAME in "${SVCS[@]}"; do
-            if screen -list | grep $NAME > /dev/null ; then        
-                screen -X -S $NAME quit > /dev/null
+        for SVC in "${SVCS[@]}"; do
+            if screen -list | grep $SVC > /dev/null ; then        
+                screen -X -S $SVC quit > /dev/null
             fi
         done
-        echo "all services stopped"
+        echo "[success] all services stopped"
         exit 0
     fi
 
@@ -80,7 +128,7 @@ sub_stop() {
     fi
 
     if screen -X -S $SVC quit > /dev/null ; then
-        echo "service '$SVC' stopped"
+        echo "[success] service '$SVC' stopped"
     else
         echo "[fatal] cannot stop service"
         exit 1
@@ -89,27 +137,148 @@ sub_stop() {
   
 sub_list() {
     if [[ $ALL -eq 1 ]]; then
-        for NAME in "${SVCS[@]}"; do
-            if screen -list | grep $NAME > /dev/null ; then STATUS="active"
+        for SVC in "${SVCS[@]}"; do
+	    remove_log $SVC
+
+            if screen -list | grep $SVC > /dev/null ; then STATUS="active"
             else STATUS="inactive"; fi
             
-            cd $WORKSPACE/$NAME
+            cd ${WORKSPACE}/${SVC}
             BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-            printf "%-30s %-10s %s\n" $NAME $STATUS $BRANCH
+            printf "%-30s %-10s %s\n" ${SVC} ${STATUS} ${BRANCH}
         done
     
     else 
-        for NAME in "${SVCS[@]}"; do
-            if screen -list | grep $NAME > /dev/null ; then 
+        for SVC in "${SVCS[@]}"; do
+            if screen -list | grep $SVC > /dev/null ; then 
                 STATUS="active"
  
-                cd $WORKSPACE/$NAME
+                cd $WORKSPACE/$SVC
                 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-                printf "%-30s %-10s %s\n" $NAME $STATUS $BRANCH
+                printf "%-30s %-10s %s\n" $SVC $STATUS $BRANCH
             fi
         done
+    fi
+}
+
+sub_utest() {
+	if cd $WORKSPACE/$SVC ; then
+            if [ ! -z "$BRANCH" ] ; then
+                git checkout -q $BRANCH
+            fi
+            sbt test | grep info --color=never
+            if [ ! -z "$CURR_BRANCH" ] ; then
+                git checkout -q $CURR_BRANCH
+            fi
+        else invalid_svc $SVC; fi
+}
+
+sub_itest() {
+	if cd $WORKSPACE/$SVC ; then
+            if [ ! -z "$BRANCH" ] ; then
+                git checkout -q $BRANCH
+            fi
+            sbt it:test | grep info --color=never
+            if [ ! -z "$CURR_BRANCH" ] ; then
+                git checkout -q $CURR_BRANCH
+            fi
+        else invalid_svc $SVC; fi
+}
+
+sub_test() {
+	if cd $WORKSPACE/$SVC ; then
+            if [ ! -z "$BRANCH" ] ; then
+                git checkout -q $BRANCH
+            fi
+            sbt test it:test | grep info --color=never
+            if [ ! -z "$CURR_BRANCH" ] ; then
+                git checkout -q $CURR_BRANCH
+            fi
+        else invalid_svc $SVC; fi
+}
+
+sub_clean() {
+	if cd $WORKSPACE/$SVC ; then
+            if [ ! -z "$BRANCH" ] ; then
+                git checkout -q $BRANCH
+            fi
+            if sbt clean > /dev/null ; then
+	        echo "[success] successfully cleaned '$SVC'"
+            else 
+                echo "[fatal] cannot clean '$SVC'"
+            fi
+            if [ ! -z "$CURR_BRANCH" ] ; then
+                git checkout -q $CURR_BRANCH
+            fi
+        else invalid_svc $SVC; fi
+}
+
+sub_compile() {
+	if cd $WORKSPACE/$SVC ; then
+            if [ ! -z "$BRANCH" ] ; then
+                git checkout -q $BRANCH
+            fi
+            if sbt compile > /dev/null ; then
+	        echo "[success] successfully compiled '$SVC'"
+            else 
+                echo "[fatal] cannot compile '$SVC'"
+            fi
+	    if [ ! -z "$CURR_BRANCH" ] ; then
+                git checkout -q $CURR_BRANCH
+            fi
+        else invalid_svc $SVC; fi
+}
+
+sub_populate() {
+	for SVC in "${SVCS[@]}"; do
+            if ! screen -list | grep $SVC > /dev/null ; then
+		echo "[fatal] all services must be running to populate"
+		exit 1
+	    fi 
+        done
+
+	cd $WORKSPACE/vat-summary-frontend
+
+	if ! screen -X -S vat-summary-frontend quit > /dev/null ; then
+	    echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
+            exit 0
+    	fi
+	if ! screen -c ${CONF_DIR}/vat-summary-frontend.conf -dmSL vat-summary-frontend sbt "run -Dapplication.router=testOnly.Routes 9152" ; then
+            echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
+            exit 0
+    	fi
+
+	sleep 10
+	
+	HOST="127.0.0.1:9152"
+	
+	curl -X "DELETE" ${HOST}/vat-through-software/test-only/clear-stub > /dev/null
+	
+	URI="vat-through-software/test-only/populate-stub"
+
+	ALL_DATA=$(find $HOME/.svc/data/ -type f -name '*.json')
+	
+
+	for DATA in ${ALL_DATA} ; do
+	    curl -s -o /dev/null -H "Content-Type:application/json" -d @${DATA} ${HOST}/${URI} 2>&1
+	done
+
+	echo -e "\n[success] successfully populated stub"
+}
+
+sub_log() {
+    if [ -f ${LOG_DIR}/${SVC}.log ]; then
+        cat ${LOG_DIR}/${SVC}.log
+    else
+        echo "[fatal] no log file found for '${SVC}'"
+    fi
+}
+
+remove_log() {
+    if [ -f ${LOG_DIR}/$1.log ]; then
+        rm ${LOG_DIR}/$1.log
     fi
 }
 
@@ -124,8 +293,8 @@ invalid_opt() {
 }
 
 invalid_subcmd() {
-    echo -e "[fatal] '$1' is not a known subcommand\n" >&2
-    echo -e "run '$PROGNAME --help' for a list of known subcommands." >&2
+    echo -e "[fatal] '$1' is not a known command\n" >&2
+    echo -e "run '$PROGNAME --help' for a list of known commands." >&2
     exit 1
 }
 
@@ -134,10 +303,23 @@ invalid_svc() {
     exit 1
 }
 
+invalid_dir() {
+    echo "[fatal] '$(basename $(pwd))' is not a recognised microservice directory" >&2
+    exit 1
+}
+
 subcmd_usage() {
-    echo -e "Usage: $PROGNAME $SUBCMD [options]\n"
-    echo -e "For help with each subcommand run:"              
-    echo -e "$PROGNAME <subcommand> -h | --help\n"
+    echo -e "${!SUBCMD}\n"
+    echo -e "Usage:"
+    echo -e "\t$PROGNAME $SUBCMD [options]"
+    echo -e "\t$PROGNAME $SUBCMD [microservice] [options]\n"
+    echo -e "Options:"
+    echo -e "\t-p, --port      Specify port to use"
+    echo -e "\t-a, --all       Use all services"
+    echo -e "\t-b, --branch    Specify a git branch"
+    echo -e "\t-h, --help      Show this screen\n"
+    echo -e "For help with each command run:"
+    echo -e "$PROGNAME <command> -h | --help\n"
     exit 1
 }
 
@@ -148,27 +330,35 @@ for pass in 1 2; do
         case $1 in
             --) shift; break;;
             -*) case $1 in
-                -p|--port)     if [ ! -z "$2" ]; then PORT=$2; else no_argument $1; fi; shift ;;
-                -h|--help)     if [ -z "$SUBCMD" ]; then usage ;  else subcmd_usage; fi ;;
                 -a|--all)      ALL=1 ;;
+		-v|--version)  version ;;                
+		-b|--branch)   if [ ! -z "$2"        ]; then BRANCH=$2; CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD); else no_argument $1; fi; shift 	;;
+                -h|--help)     if [   -z "${SUBCMD}" ]; then usage ;    else subcmd_usage;   fi 	;;
+                -p|--port)     if [ ! -z "$2"        ]; then PORT=$2;   else no_argument $1; fi; shift 	;;
                 --*)           invalid_opt $1 ;;
-                -*)            if [ $pass -eq 1 ]; then ARGS="$ARGS $1";
-                               else invalid_opt $1 ; fi;;
+                -*)            if [ ${pass} -eq 1 ]; 	then ARGS="$ARGS $1";
+                               else invalid_opt $1 ; 	fi;;
                 esac;;
                 
-            *)  if   [[ ${SUBCMDS[*]} == *"$1"* ]]; then SUBCMD=$1
-                elif [[ ${SVCS[*]}    == *"$1"* ]]; then SVC=$1
-                elif [ -z "$SUBCMD" ];              then invalid_subcmd $1
-                elif [ -z "$SVC"    ];              then invalid_svc $1
+            *)  if   [[ ${SUBCMDS[*]} == *"$1"* ]]; 	then SUBCMD=$1
+                elif [[ ${SVCS[*]}    == *"$1"* ]]; 	then SVC=$1
+                elif [ -z "$SUBCMD" ];              	then invalid_subcmd $1
+                elif [ -z "$SVC"    ];              	then invalid_svc $1 
                 else invalid_opt $1 ; fi ;;
 
         esac
         shift
     done
-    if [ $pass -eq 1 ]; then ARGS=`getopt $opts $ARGS`
-        if [ $? != 0 ]; then usage; exit 2; fi; set -- $ARGS
+    if [ ${pass} -eq 1 ]; then ARGS=`getopt ${opts} ${ARGS}`
+        if [ $? != 0 ];   then usage; exit 2; fi; set -- ${ARGS}
     fi
 done
 
-sub_$SUBCMD
+if [ -z "$SVC" ] && [ $SUBCMD != "list" ] && [ $SUBCMD != "populate" ]; then 
+    if [[ ${SVCS[*]} == *"$(basename $(pwd))"* ]]; then SVC=$(basename $(pwd))
+    else invalid_dir; fi
+fi
+
+sub_${SUBCMD}
 exit 0
+

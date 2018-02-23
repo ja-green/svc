@@ -1,0 +1,17 @@
+{
+  "_id" : "/444444444/obligations?from=2017-01-01&to=2017-12-31&status=F",
+  "method" : "GET",
+  "status" : 200,
+  "response" : {
+    "obligations": [
+      {
+        "start": "2017-09-01",
+        "end": "2017-11-30",
+        "due": "2018-01-07",
+        "status": "F",
+        "received": "2017-12-12",
+        "periodKey": "18BB"
+      }
+    ]
+  }
+}

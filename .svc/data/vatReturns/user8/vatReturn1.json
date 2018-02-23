@@ -1,0 +1,17 @@
+{
+  "_id" : "/888888888/returns/18CC",
+  "method" : "GET",
+  "status" : 200,
+  "response" : {
+    "periodKey": "18CC",
+    "vatDueSales": 100.00,
+    "vatDueAcquisitions": 100.00,
+    "totalVatDue": 200,
+    "vatReclaimedCurrPeriod": 100.00,
+    "netVatDue": 100,
+    "totalValueSalesExVAT": 500,
+    "totalValuePurchasesExVAT": 500,
+    "totalValueGoodsSuppliedExVAT": 500,
+    "totalAcquisitionsExVAT": 500
+  }
+}

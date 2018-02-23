@@ -1,0 +1,8 @@
+{
+  "_id" : "/financial-transactions/vat/111111110",
+  "method" : "GET",
+  "status" : 500,
+  "response" : {
+    "message" : "Internal server error"
+  }
+}

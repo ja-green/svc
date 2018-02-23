@@ -1,0 +1,17 @@
+{
+  "_id" : "/666666666/returns/18AA",
+  "method" : "GET",
+  "status" : 200,
+  "response" : {
+    "periodKey": "18AA",
+    "vatDueSales": 100.00,
+    "vatDueAcquisitions": 100.00,
+    "totalVatDue": 200,
+    "vatReclaimedCurrPeriod": 100.00,
+    "netVatDue": 100,
+    "totalValueSalesExVAT": 500,
+    "totalValuePurchasesExVAT": 500,
+    "totalValueGoodsSuppliedExVAT": 500,
+    "totalAcquisitionsExVAT": 500
+  }
+}
