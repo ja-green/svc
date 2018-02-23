@@ -358,7 +358,7 @@ for pass in 1 2; do
     fi
 done
 
-if [ -z "$SVC" ] || [ $SUBCMD != "list" ] || [ $SUBCMD != "populate" ] || [ $ALL -eq 0 ] ; then 
+if [ -z "$SVC" ] || [ $SUBCMD != "list" ] || [ $SUBCMD != "populate" ] || [ $ALL -eq 1 ] ; then 
     if [[ ${SVCS[*]} == *"$(basename $(pwd))"* ]]; then SVC=$(basename $(pwd))
     else invalid_dir; fi
 fi
