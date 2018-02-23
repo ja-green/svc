@@ -286,6 +286,13 @@ remove_log() {
     fi
 }
 
+get_svcname() {
+    if [[ ${SVCS[*]} == *"$(basename $(pwd))"* ]]; then 
+	SVC=$(basename $(pwd))
+    else invalid_dir
+    fi
+}
+
 no_argument() {
     echo -e "[fatal] option '$1' requires an argument\n"
     subcmd_usage
@@ -358,9 +365,8 @@ for pass in 1 2; do
     fi
 done
 
-if [ ! -z "$SVC" ] && [ $SUBCMD != "list" ] && [ $SUBCMD != "populate" ] && [ $ALL -eq 0 ] ; then 
-    if [[ ${SVCS[*]} == *"$(basename $(pwd))"* ]]; then SVC=$(basename $(pwd))
-    else invalid_dir; fi
+if [ -z "$SVC" ] && [[ $SUBCMD =~ ^(start|stop|test|utest|itest|log|clean|compile)$ ]] && [[ $ALL -eq 0 ]]; then
+    get_svcname
 fi
 
 sub_${SUBCMD}
