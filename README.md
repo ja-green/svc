@@ -1,6 +1,6 @@
 # *svc*
 
-Tool for managing running and testign HMRC VAT:VC microservices
+Tool for managing running and testing HMRC VAT:VC microservices
 
 ## Getting Started
 
