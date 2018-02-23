@@ -28,6 +28,25 @@ Install via make:
 ```bash
 $ make install
 ```
+### Updating
+
+Pull from github:
+
+```bash
+$ git pull
+```
+
+Update via make:
+
+```bash
+$ make update
+```
+
+Your bash sources need to be updated after this too:
+
+```bash
+$ source ~/.bashrc
+```
 ## Usage
 
 ```
