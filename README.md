@@ -1,6 +1,6 @@
 # *svc*
 
-Tool for managing running HMRC VAT:VC microservices
+Tool for managing running and testign HMRC VAT:VC microservices
 
 ## Getting Started
 
@@ -8,7 +8,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-The program `screen` is needed for `svc` to run. Use `apt-get` to install on Ubuntu:
+The program `screen` is needed for `svc` to run. Use `make dep` to install automatically or if you would like to do it manually:
 
 ```bash
 $ sudo apt-get update
@@ -23,20 +23,15 @@ Clone from github:
 $ git clone git@github.com:ja-green/svc.git
 ```
 
-Add executable rights:
+Install via make:
 
 ```bash
-$ sudo chmod +x svc/svc
-```
-
-**(Optional)** Move the program into `/usr/local/bin` to enable system-wide execution: 
-
-```bash
-$ sudo mv /svc/svc /usr/local/bin
+$ make install
 ```
 ## Usage
 
 ```
+svc <subcommand> [options]
 svc <subcommand> [microservice] [options]
 ```
 
@@ -46,14 +41,23 @@ svc <subcommand> [microservice] [options]
 start             start inactive microservice(s)
 stop              stop active microservice(s)
 list              list microservice(s)
+log               print service output
+test              run unit and integration tests
+utest             run unit tests
+itest             run integration tests
+clean             clean microservice files
+compile           compile the microservice code
+populate          populate the services with data
 ```
 
 ### Options
 
 ```
--h | --help       display help screen for program / specific subcommand
--p | --port       specify a port to run a microservice on
--a | --all        apply command to all available microservices
+-h, --help        display help screen for program / specific subcommand
+-p, --port        specify a port to run a microservice on
+-a, --all         apply command to all available microservices
+-b. --branch      specify a git branch
+-v, --version     show version information
 ```
 
 ### Examples
