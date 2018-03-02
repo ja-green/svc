@@ -2,13 +2,14 @@
 
 PROGNAME=$(basename $0)
 VERSION=0.2.0
-SVC_DIR="$HOME/.svc/"
-LOG_DIR="$SVC_DIR/log/"
-CONF_DIR="$SVC_DIR/conf/"
+SVC_DIR=$HOME/.svc/
+LOG_DIR=$SVC_DIR/log/
+CONF_DIR=$SVC_DIR/conf/
+STUB_DATA=$(find $WORKSPACE/view-vat-acceptance-tests/src/test/resources/stubData/ -type f -name '*.json')
 
 SUBCMDS=(start stop list log test utest itest clean compile populate)
 SVCS=(vat-summary-frontend view-vat-returns-frontend)
-opts=":ahp:"
+opts=":ahbp:"
 
 main="Manage the running and testing of HMRC VAT:VC microservices"
 start="Start running a microservice"
@@ -250,7 +251,7 @@ sub_populate() {
             exit 0
     	fi
 
-	remove_log
+	remove_log vat-summary-frontend
 	while [ true ]; do
        	    if cat $LOG_DIR/vat-summary-frontend.log | grep started > /dev/null ; then break; fi
             sleep 1
@@ -258,14 +259,11 @@ sub_populate() {
 	
 	HOST="127.0.0.1:9152"
 	
-	curl -X "DELETE" ${HOST}/vat-through-software/test-only/clear-stub > /dev/null
+	curl -s -o /dev/null -X "DELETE" ${HOST}/vat-through-software/test-only/clear-stub 2>&1
 	
 	URI="vat-through-software/test-only/populate-stub"
 
-	ALL_DATA=$(find $HOME/.svc/data/ -type f -name '*.json')
-	
-
-	for DATA in ${ALL_DATA} ; do
+	for DATA in ${STUB_DATA} ; do
 	    curl -s -o /dev/null -H "Content-Type:application/json" -d @${DATA} ${HOST}/${URI} 2>&1
 	done
 
@@ -281,9 +279,7 @@ sub_log() {
 }
 
 remove_log() {
-    if [ -f ${LOG_DIR}/$1.log ]; then
-        rm ${LOG_DIR}/$1.log
-    fi
+    echo -n "" > ${LOG_DIR}/$1.log
 }
 
 get_svcname() {
@@ -334,7 +330,7 @@ subcmd_usage() {
     exit 1
 }
 
-if [ $# -eq 0 ]; then usage; fi
+if [[ $# -eq 0 ]]; then usage; fi
 
 for pass in 1 2; do
     while [ -n "$1" ]; do
