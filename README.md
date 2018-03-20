@@ -74,6 +74,7 @@ populate          populate the services with data
 ```
 -h, --help        display help screen for program / specific subcommand
 -p, --port        specify a port to run a microservice on
+-t, --test-only   start a service with test only routes enabled
 -a, --all         apply command to all available microservices
 -b. --branch      specify a git branch
 -v, --version     show version information
@@ -114,12 +115,12 @@ $ svc list
 
 #### Bug Reports & Feature Requests
 
-Please use the [issue tracker](https://github.com/karan/joe/issues) to report any bugs or file feature requests.
+Please use the [issue tracker](https://github.com/ja-green/svc/issues) to report any bugs or file feature requests.
 
 #### Developing
 
-Please read [CONTRIBUTING](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on code of conduct, and the process for submitting pull requests.
+Please read [CONTRIBUTING](https://github.com/ja-green/svc/CONTRIBUTING) for details on code of conduct, and the process for submitting pull requests.
 
 ## License
 
-This project is licensed under the APACHE 2.0 License - see [LICENSE](LICENSE.md) for details
+This project is licensed under the APACHE 2.0 License - see [LICENSE](https://github.com/ja-green/svc/LICENSE.md) for details

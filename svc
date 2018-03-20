@@ -9,7 +9,7 @@ STUB_DATA=$(find $WORKSPACE/view-vat-acceptance-tests/src/test/resources/stubDat
 
 SUBCMDS=(start stop list log test utest itest clean compile populate)
 SVCS=(vat-summary-frontend view-vat-returns-frontend)
-opts=":ahbp:"
+opts=":ahtb:p:"
 
 main="Manage the running and testing of HMRC VAT:VC microservices"
 start="Start running a microservice"
@@ -42,6 +42,7 @@ usage() {
     echo -e "Options:"
     echo -e "\t-p, --port      Specify port to use"
     echo -e "\t-a, --all       Use all services"
+    echo -e "\t-t, --test-only Start service using test only routes"
     echo -e "\t-b, --branch    Specify a git branch"
     echo -e "\t-h, --help      Show this screen"
     echo -e "\t-v, --version   Show version information\n"
@@ -73,8 +74,14 @@ sub_start() {
                 if [ ! -z "$BRANCH" ] ; then
         	    git checkout -q $BRANCH
     		fi
-                screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT"
+		
+		if [[ ${TEST_ONLY} -eq 1 ]]; then
+        	    screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run -Dapplication.router=testOnly.Routes $PORT"
+		else
+		    screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT"
+    		fi
             fi
+
         done
         echo "[success] all services started"
         exit 0
@@ -83,7 +90,7 @@ sub_start() {
     remove_log $SVC
 
     if screen -list | grep $SVC > /dev/null ; then
-        echo "[warn] service already running"
+        echo "[warn] '$SVC' already running"
         exit 0
     fi
 
@@ -99,12 +106,24 @@ sub_start() {
     if [ ! -z "$BRANCH" ] ; then
         git checkout -q $BRANCH
     fi
-    if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT" ; then
-        echo "[success] service '$SVC' started on port $PORT"
+
+    if [[ ${TEST_ONLY} -eq 1 ]]; then
+        if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run -Dapplication.router=testOnly.Routes $PORT" ; then
+            echo "[success] service '$SVC' started on port $PORT with test only routes"
+        else
+           echo "[fatal] cannot start '$SVC' with test only routes"
+           exit 1
+        fi
     else
-        echo "[fatal] cannot start service"
-        exit 1
+        if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT" ; then
+           echo "[success] service '$SVC' started on port $PORT"
+        else
+           echo "[fatal] cannot start '$SVC'"
+           exit 1
+        fi
     fi
+
+    
     if [ ! -z "$CURR_BRANCH" ] ; then
         git checkout -q $CURR_BRANCH
     fi
@@ -124,14 +143,14 @@ sub_stop() {
     fi
 
     if ! screen -list | grep $SVC > /dev/null ; then
-        echo "[warn] service not running"
+        echo "[warn] '$SVC' not running"
         exit 1
     fi
 
     if screen -X -S $SVC quit > /dev/null ; then
         echo "[success] service '$SVC' stopped"
     else
-        echo "[fatal] cannot stop service"
+        echo "[fatal] cannot stop '$SVC'"
         exit 1
     fi
 }
@@ -240,22 +259,22 @@ sub_populate() {
 	    fi 
         done
 
-	cd $WORKSPACE/vat-summary-frontend
-
-	if ! screen -X -S vat-summary-frontend quit > /dev/null ; then
-	    echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
-            exit 0
-    	fi
-	if ! screen -c ${CONF_DIR}/vat-summary-frontend.conf -dmSL vat-summary-frontend sbt "run -Dapplication.router=testOnly.Routes 9152" ; then
-            echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
-            exit 0
-    	fi
-
-	remove_log vat-summary-frontend
-	while [ true ]; do
-       	    if cat $LOG_DIR/vat-summary-frontend.log | grep started > /dev/null ; then break; fi
-            sleep 1
-        done
+#	cd $WORKSPACE/vat-summary-frontend
+#
+#	if ! screen -X -S vat-summary-frontend quit > /dev/null ; then
+#	    echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
+#            exit 0
+#    	fi
+#	if ! screen -c ${CONF_DIR}/vat-summary-frontend.conf -dmSL vat-summary-frontend sbt "run -Dapplication.router=testOnly.Routes 9152" ; then
+#            echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
+#            exit 0
+#    	fi
+#
+#	remove_log vat-summary-frontend
+#	while [ true ]; do
+#       	    if cat $LOG_DIR/vat-summary-frontend.log | grep started > /dev/null ; then break; fi
+#            sleep 1
+#        done
 	
 	HOST="127.0.0.1:9152"
 	
@@ -264,10 +283,13 @@ sub_populate() {
 	URI="vat-through-software/test-only/populate-stub"
 
 	for DATA in ${STUB_DATA} ; do
-	    curl -s -o /dev/null -H "Content-Type:application/json" -d @${DATA} ${HOST}/${URI} 2>&1
+	    if ! curl -s -o /dev/null -H "Content-Type:application/json" -d @${DATA} ${HOST}/${URI} 2>&1 ; then
+	        echo -e "[fatal] cannot populate stub. \n\nMake sure 'vat-summary-frontend' is running with test only routes enabled"
+		exit 1
+	    fi
 	done
 
-	echo -e "\n[success] successfully populated stub"
+	echo -e "[success] successfully populated stub"
 }
 
 sub_log() {
@@ -337,14 +359,15 @@ for pass in 1 2; do
         case $1 in
             --) shift; break;;
             -*) case $1 in
-                -a|--all)      ALL=1 ;;
-		-v|--version)  version ;;                
-		-b|--branch)   if [ ! -z "$2"        ]; then BRANCH=$2; CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD); else no_argument $1; fi; shift 	;;
-                -h|--help)     if [   -z "${SUBCMD}" ]; then usage ;    else subcmd_usage;   fi 	;;
-                -p|--port)     if [ ! -z "$2"        ]; then PORT=$2;   else no_argument $1; fi; shift 	;;
-                --*)           invalid_opt $1 ;;
-                -*)            if [ ${pass} -eq 1 ]; 	then ARGS="$ARGS $1";
-                               else invalid_opt $1 ; 	fi;;
+                -a|--all)       ALL=1 ;;
+		-t|--test-only) TEST_ONLY=1 ;;
+		-v|--version)   version ;;                
+		-b|--branch)    if [ ! -z "$2"        ]; then BRANCH=$2; CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD); else no_argument $1; fi; shift 	;;
+                -h|--help)      if [   -z "${SUBCMD}" ]; then usage ;    else subcmd_usage;   fi 	;;
+                -p|--port)      if [ ! -z "$2"        ]; then PORT=$2;   else no_argument $1; fi; shift 	;;
+                --*)            invalid_opt $1 ;;
+                -*)             if [ ${pass} -eq 1 ]; 	then ARGS="$ARGS $1";
+                                else invalid_opt $1 ; 	fi;;
                 esac;;
                 
             *)  if   [[ ${SUBCMDS[*]} == *"$1"* ]]; 	then SUBCMD=$1
