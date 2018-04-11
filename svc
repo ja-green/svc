@@ -17,17 +17,17 @@
 ## svc
 ## tool for managing running and testing HMRC VAT:VC microservices
 ##
-## Examples
-## Run vat-summary-frontend on it's default port:
+## examples:
+## run vat-summary-frontend on it's default port:
 ##     $ svc start vat-summary-frontend
 ##
-## Run view-vat-returns-frontend on port 1234:
+## run view-vat-returns-frontend on port 1234:
 ##     $ svc start view-vat-returns-frontend -p 1234
 ##
-## Stop all running microservices:
+## stop all running microservices:
 ##     $ svc stop -a
 ##
-## List all microservices and their status:
+## list all microservices and their status:
 ##     $ svc list -a
 ##
 
@@ -267,10 +267,6 @@ service_running() {
 ## main commands
 
 sub_start() {
-  #if [ -z "${service}" ] && [[ ${all} -eq 0 ]]; then
-  #  command_usage
-  #fi
-
   if [[ ${all} -eq 1 ]]; then
     for service in "${services[@]}"; do
       if ! service_running ${service} ; then
@@ -339,10 +335,6 @@ sub_start() {
 }
   
 sub_stop() {
-  if [ -z "$service" ] && [[ $all -eq 0 ]]; then
-    command_usage
-  fi
-
   if [[ ${all} -eq 1 ]]; then
     for service in "${services[@]}"; do
       if service_running ${service} ; then
@@ -490,18 +482,18 @@ sub_compile() {
 }
 
 sub_populate() {
-	stub_host="127.0.0.1:9152"
-	stub_uri="vat-through-software/test-only/populate-stub"
+  stub_host="127.0.0.1:9152"
+  stub_uri="vat-through-software/test-only/populate-stub"
 
-	curl -s -o /dev/null -X "DELETE" ${stub_host}/vat-through-software/test-only/clear-stub 2>&1
+  curl -s -o /dev/null -X "DELETE" ${stub_host}/vat-through-software/test-only/clear-stub 2>&1
 
-	for data in ${stub_data} ; do
-	  if ! curl -s -o /dev/null -H "Content-Type:application/json" -d @${data} ${stub_host}/${stub_uri} 2>&1; then
-	    error "${err_cannot_populate}" "vat-summary-frontend"
-	  fi
-	done
+  for data in ${stub_data} ; do
+    if ! curl -s -o /dev/null -H "Content-Type:application/json" -d @${data} ${stub_host}/${stub_uri} 2>&1; then
+      error "${err_cannot_populate}" "vat-summary-frontend"
+    fi
+  done
 
-	echo -e "${stat_success} successfully populated stub"
+  echo -e "${stat_success} successfully populated stub"
 }
 
 sub_log() {
