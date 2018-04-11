@@ -171,17 +171,19 @@ check_for_update() {
   git fetch -q
   echo -n $(date +%D) > ${prog_updf}
 
-  if [[ $(git rev-parse HEAD) != $(git rev-parse @{u}) ]]; then
+  if [[ $(git rev-parse HEAD >/dev/null) != $(git rev-parse @{u} >/dev/null) ]]; then
     echo -e "there is an update available\n"
 
     while true; do
-      read -p "do you wish to update? (y/n)" yn
+      read -p "do you wish to update? (y/n): " yn
       case ${yn} in
           [Yy]*) sub_update; break ;;
           [Nn]*) return ;;
           *)     echo "please answer yes or no" ;;
       esac
     done
+
+    echo -e "\n"
   fi
 }
 
