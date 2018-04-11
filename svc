@@ -1,397 +1,606 @@
 #!/bin/bash
 
-PROGNAME=$(basename $0)
-VERSION=0.2.0
-SVC_DIR=$HOME/.svc/
-LOG_DIR=$SVC_DIR/log/
-CONF_DIR=$SVC_DIR/conf/
-STUB_DATA=$(find $WORKSPACE/view-vat-acceptance-tests/src/test/resources/stubData/ -type f -name '*.json')
+## Copyright 2018 Jack Green (ja-green)
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
 
-SUBCMDS=(start stop list log test utest itest clean compile populate)
-SVCS=(vat-summary-frontend view-vat-returns-frontend)
-opts=":ahtb:p:"
+## svc
+## tool for managing running and testing HMRC VAT:VC microservices
+##
+## Examples
+## Run vat-summary-frontend on it's default port:
+##     $ svc start vat-summary-frontend
+##
+## Run view-vat-returns-frontend on port 1234:
+##     $ svc start view-vat-returns-frontend -p 1234
+##
+## Stop all running microservices:
+##     $ svc stop -a
+##
+## List all microservices and their status:
+##     $ svc list -a
+##
 
-main="Manage the running and testing of HMRC VAT:VC microservices"
-start="Start running a microservice"
-stop="Stop a running microservice"
-list="List microservices"
-log="Print service output"
-test="Run unit and integration tests"
-utest="Run unit tests"
-itest="Run integration tests"
-clean="Clean microservice files"
-compile="Compile the microservice code"
-populate="Populate the services with data"
+## variable definitions
 
-usage() {
-    echo -e "${main}\n"
-    echo -e "Usage:"
-    echo -e "\t$PROGNAME <command> [options]"
-    echo -e "\t$PROGNAME <command> [microservice] [options]\n"
-    echo -e "Commands:"
-    echo -e "\tstart           $start"
-    echo -e "\tstop            $stop"
-    echo -e "\tlist            $list"
-    echo -e "\tlog             $log"
-    echo -e "\ttest            $test"
-    echo -e "\tutest           $utest"
-    echo -e "\titest           $itest"
-    echo -e "\tclean           $clean"
-    echo -e "\tcompile         $compile"
-    echo -e "\tpopulate        $populate\n"
-    echo -e "Options:"
-    echo -e "\t-p, --port      Specify port to use"
-    echo -e "\t-a, --all       Use all services"
-    echo -e "\t-t, --test-only Start service using test only routes"
-    echo -e "\t-b, --branch    Specify a git branch"
-    echo -e "\t-h, --help      Show this screen"
-    echo -e "\t-v, --version   Show version information\n"
-    echo -e "For help with each command run:"
-    echo -e "$PROGNAME <command> -h | --help\n"
-    exit 0
+prog_name="$(basename ${0})"
+prog_repo="$(locate svc/.git | head -n 1)/.."
+prog_vers="$(cat ${prog_repo}/VERSION)"
+prog_home="$HOME/.svc/"
+prog_updf="${prog_home}/UPDATE"
+prog_logs="${prog_home}/log/"
+prog_conf="${prog_home}/conf/"
+prog_updt="$(cat ${prog_updf})"
+prog_opts=":ahtb:p:"
+prog_exit=0
+
+stub_data=$(find ${WORKSPACE}/view-vat-acceptance-tests/src/test/resources/stubData/ -type f -name '*.json')
+
+commands=("start" "stop" "list" "log" "test" "utest" "itest" "clean" "compile" "populate" "update" "tag" "head")
+services=("vat-summary-frontend" "view-vat-returns-frontend")
+
+# main usage text
+main="${prog_name} v${prog_vers}\n\nmanage the running and testing of HMRC VAT:VC microservices"
+
+# command usage text
+start=("start running a microservice" "flags: \
+  \n\t-p, --port      specify port to start on \
+  \n\t-a, --all       start all services \
+  \n\t-t, --test-only start service using test only routes \
+  \n\t-b, --branch    specify a git branch\n")
+stop=("stop a running microservice" "flags: \
+  \n\t-a, --all       stop all services\n")
+list=("list microservices" "flags: \
+  \n\t-a, --all       list all services\n")
+log=("show service output" "")
+test=("run unit and integration tests" "flags: \
+  \n\t-b, --branch    specify a git branch\n")
+utest=("run unit tests" "flags: \
+  \n\t-b, --branch    specify a git branch\n")
+itest=("run integration tests" "flags: \
+  \n\t-b, --branch    specify a git branch\n")
+clean=("clean microservice files" "flags: \
+  \n\t-b, --branch    specify a git branch\n")
+compile=("compile the microservice code" "")
+update=("update to the latest version of ${prog_name}" "")
+populate=("populate the services with data" "")
+tag=("show the latest git tag" "")
+head=("show the current working branch" "")
+
+# status tags
+stat_success="success:"
+stat_warn="warn:"
+stat_fatal="fatal:"
+stat_hint="hint:"
+
+# error messages
+err_cannot_start_testonly="${stat_fatal} cannot start '%s' with test only routes\n"
+err_cannot_start="${stat_fatal} cannot start '%s'\n"
+err_cannot_stop="${stat_fatal} cannot stop '%s'\n"
+err_cannot_compile="${stat_fatal} cannot compile '%s'\n"
+err_cannot_clean="${stat_fatal} cannot clean '%s'\n"
+err_cannot_update="${stat_fatal} cannot update\n"
+err_cannot_populate="${stat_fatal} cannot populate stub.
+\n\n${stat_hint} Make sure '%s' is running with test only routes enabled\n"
+err_no_logfile="${stat_fatal} no log file found for '%s'\n"
+err_not_running="${stat_warn} '%s' is not running\n"
+err_already_running="${stat_warn} '%s' already running\n"
+err_no_argument="${stat_fatal} option '%s' requires an argument\n"
+err_invalid_opt="${stat_fatal} unknown option '%s'\n"
+err_invalid_service="${stat_fatal} '%s' is not a known service\n"
+err_invalid_dir="${stat_fatal} '%s' is not a recognised microservice directory\n"
+err_invalid_command="${stat_fatal} '%s' is not a known command\n
+run '${prog_name} --help' for a list of known commands\n"
+
+usage_end="for help with each command run: \
+  \n\t${prog_name} <command> -h | --help\n"
+
+flags_global="global flags: \
+  \n\t-h, --help      show this screen \
+  \n\t-v, --version   show version information\n"
+
+## usage commands
+
+main_usage() {
+  echo -e "${main}\n \
+    \nusage:\
+    \n\t${prog_name} <command> [options] \
+    \n\t${prog_name} <command> [microservice] [options] \
+    \n\ncommands:                   \
+    \n\tstart           ${start}    \
+    \n\tstop            ${stop}     \
+    \n\tlist            ${list}     \
+    \n\tlog             ${log}      \
+    \n\tpopulate        ${populate} \
+    \n\ttest            ${test}     \
+    \n\tutest           ${utest}    \
+    \n\titest           ${itest}    \
+    \n\tclean           ${clean}    \
+    \n\ttag             ${tag}      \
+    \n\thead            ${head}     \
+    \n\tcompile         ${compile}  \
+    \n\tupdate          ${update}\n"
+
+  echo -e "${flags_global}"
+  echo -e "${usage_end}"
+
+  exit ${prog_exit}
+}
+
+command_usage() {
+  eval command_array="(\"\${${command}[@]}\")"
+
+  about="${command_array[0]}"
+  flags="${command_array[1]}"
+
+  echo -e "${about}\n \
+    \nusage: \
+    \n\t${prog_name} ${command} [options] \
+    \n\t${prog_name} ${command} [microservice] [options]\n"
+
+  echo -e "${flags}"
+  echo -e "${flags_global}"
+  echo -e "${usage_end}"
+
+  exit ${prog_exit}
 }
 
 version() {
-    echo -e "$PROGNAME version $VERSION"
-    exit 0
+  echo -e "${prog_name} version ${prog_vers}"
 
-}
-  
-sub_start() {
-    if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
-
-    if [[ $ALL -eq 1 ]]; then
-        for SVC in "${SVCS[@]}"; do
-            if ! screen -list | grep $SVC > /dev/null ; then
-                remove_log $SVC
-     
-                case $SVC in
-                "vat-summary-frontend")		PORT=9152 ;;
-                "view-vat-returns-frontend")    PORT=9151 ;;
-                esac
-
-                cd $WORKSPACE/$SVC
-                if [ ! -z "$BRANCH" ] ; then
-        	    git checkout -q $BRANCH
-    		fi
-		
-		if [[ ${TEST_ONLY} -eq 1 ]]; then
-        	    screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run -Dapplication.router=testOnly.Routes $PORT"
-		else
-		    screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT"
-    		fi
-            fi
-
-        done
-        echo "[success] all services started"
-        exit 0
-    fi
-
-    remove_log $SVC
-
-    if screen -list | grep $SVC > /dev/null ; then
-        echo "[warn] '$SVC' already running"
-        exit 0
-    fi
-
-    if [ -z "$PORT" ]; then 
-        case $SVC in
-        "vat-summary-frontend")		PORT=9152 ;;
-        "view-vat-returns-frontend")    PORT=9151 ;;
-        *)	                        PORT=9000 ;;
-        esac 
-    fi
-
-    cd $WORKSPACE/$SVC
-    if [ ! -z "$BRANCH" ] ; then
-        git checkout -q $BRANCH
-    fi
-
-    if [[ ${TEST_ONLY} -eq 1 ]]; then
-        if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run -Dapplication.router=testOnly.Routes $PORT" ; then
-            echo "[success] service '$SVC' started on port $PORT with test only routes"
-        else
-           echo "[fatal] cannot start '$SVC' with test only routes"
-           exit 1
-        fi
-    else
-        if screen -c ${CONF_DIR}/${SVC}.conf -dmSL $SVC sbt "run $PORT" ; then
-           echo "[success] service '$SVC' started on port $PORT"
-        else
-           echo "[fatal] cannot start '$SVC'"
-           exit 1
-        fi
-    fi
-
-    
-    if [ ! -z "$CURR_BRANCH" ] ; then
-        git checkout -q $CURR_BRANCH
-    fi
-}
-  
-sub_stop() {
-    if [ -z "$SVC" ] && [[ $ALL -eq 0 ]]; then subcmd_usage ; fi
-
-    if [[ $ALL -eq 1 ]]; then
-        for SVC in "${SVCS[@]}"; do
-            if screen -list | grep $SVC > /dev/null ; then        
-                screen -X -S $SVC quit > /dev/null
-            fi
-        done
-        echo "[success] all services stopped"
-        exit 0
-    fi
-
-    if ! screen -list | grep $SVC > /dev/null ; then
-        echo "[warn] '$SVC' not running"
-        exit 1
-    fi
-
-    if screen -X -S $SVC quit > /dev/null ; then
-        echo "[success] service '$SVC' stopped"
-    else
-        echo "[fatal] cannot stop '$SVC'"
-        exit 1
-    fi
-}
-  
-sub_list() {
-    if [[ $ALL -eq 1 ]]; then
-        for SVC in "${SVCS[@]}"; do
-	    remove_log $SVC
-
-            if screen -list | grep $SVC > /dev/null ; then STATUS="active"
-            else STATUS="inactive"; fi
-            
-            cd ${WORKSPACE}/${SVC}
-            BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-            printf "%-30s %-10s %s\n" ${SVC} ${STATUS} ${BRANCH}
-        done
-    
-    else 
-        for SVC in "${SVCS[@]}"; do
-            if screen -list | grep $SVC > /dev/null ; then 
-                STATUS="active"
- 
-                cd $WORKSPACE/$SVC
-                BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-                printf "%-30s %-10s %s\n" $SVC $STATUS $BRANCH
-            fi
-        done
-    fi
+  exit ${prog_exit}
 }
 
-sub_utest() {
-	if cd $WORKSPACE/$SVC ; then
-            if [ ! -z "$BRANCH" ] ; then
-                git checkout -q $BRANCH
-            fi
-            sbt test | grep info --color=never
-            if [ ! -z "$CURR_BRANCH" ] ; then
-                git checkout -q $CURR_BRANCH
-            fi
-        else invalid_svc $SVC; fi
+## helper commands
+
+check_for_update() {
+  if [[ ${prog_updt} == $(date +%D) ]]; then
+    return
+  fi
+
+  git fetch -q
+  echo -n $(date +%D) > ${prog_updf}
+
+  if [[ $(git rev-parse HEAD) != $(git rev-parse @{u}) ]]; then
+    echo -e "there is an update available\n"
+
+    while true; do
+      read -p "do you wish to update? (y/n)" yn
+      case ${yn} in
+          [Yy]*) sub_update; break ;;
+          [Nn]*) return ;;
+          *)     echo "please answer yes or no" ;;
+      esac
+    done
+  fi
 }
 
-sub_itest() {
-	if cd $WORKSPACE/$SVC ; then
-            if [ ! -z "$BRANCH" ] ; then
-                git checkout -q $BRANCH
-            fi
-            sbt it:test | grep info --color=never
-            if [ ! -z "$CURR_BRANCH" ] ; then
-                git checkout -q $CURR_BRANCH
-            fi
-        else invalid_svc $SVC; fi
+is_command() {
+  if [[ -z $(printf '%s\n' "${commands[@]}" | grep -w ${1}) ]]; then
+    return 1
+  fi
 }
 
-sub_test() {
-	if cd $WORKSPACE/$SVC ; then
-            if [ ! -z "$BRANCH" ] ; then
-                git checkout -q $BRANCH
-            fi
-            sbt test it:test | grep info --color=never
-            if [ ! -z "$CURR_BRANCH" ] ; then
-                git checkout -q $CURR_BRANCH
-            fi
-        else invalid_svc $SVC; fi
+is_service() {
+  if [[ -z $(printf '%s\n' "${services[@]}" | grep -w ${1}) ]]; then
+    return 1
+  fi
 }
 
-sub_clean() {
-	if cd $WORKSPACE/$SVC ; then
-            if [ ! -z "$BRANCH" ] ; then
-                git checkout -q $BRANCH
-            fi
-            if sbt clean > /dev/null ; then
-	        echo "[success] successfully cleaned '$SVC'"
-            else 
-                echo "[fatal] cannot clean '$SVC'"
-            fi
-            if [ ! -z "$CURR_BRANCH" ] ; then
-                git checkout -q $CURR_BRANCH
-            fi
-        else invalid_svc $SVC; fi
+is_command_set() {
+  if [[ ! ${command+x} ]]; then
+    return 1
+  fi
 }
 
-sub_compile() {
-	if cd $WORKSPACE/$SVC ; then
-            if [ ! -z "$BRANCH" ] ; then
-                git checkout -q $BRANCH
-            fi
-            if sbt compile > /dev/null ; then
-	        echo "[success] successfully compiled '$SVC'"
-            else 
-                echo "[fatal] cannot compile '$SVC'"
-            fi
-	    if [ ! -z "$CURR_BRANCH" ] ; then
-                git checkout -q $CURR_BRANCH
-            fi
-        else invalid_svc $SVC; fi
+is_service_set() {
+  if [[ ! ${service+x} ]]; then
+    return 1
+  fi
 }
 
-sub_populate() {
-	for SVC in "${SVCS[@]}"; do
-            if ! screen -list | grep $SVC > /dev/null ; then
-		echo "[fatal] all services must be running to populate"
-		exit 1
-	    fi 
-        done
-
-#	cd $WORKSPACE/vat-summary-frontend
-#
-#	if ! screen -X -S vat-summary-frontend quit > /dev/null ; then
-#	    echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
-#            exit 0
-#    	fi
-#	if ! screen -c ${CONF_DIR}/vat-summary-frontend.conf -dmSL vat-summary-frontend sbt "run -Dapplication.router=testOnly.Routes 9152" ; then
-#            echo "[fatal] cannot start 'vat-summary-frontend' with test-only routes"
-#            exit 0
-#    	fi
-#
-#	remove_log vat-summary-frontend
-#	while [ true ]; do
-#       	    if cat $LOG_DIR/vat-summary-frontend.log | grep started > /dev/null ; then break; fi
-#            sleep 1
-#        done
-	
-	HOST="127.0.0.1:9152"
-	
-	curl -s -o /dev/null -X "DELETE" ${HOST}/vat-through-software/test-only/clear-stub 2>&1
-	
-	URI="vat-through-software/test-only/populate-stub"
-
-	for DATA in ${STUB_DATA} ; do
-	    if ! curl -s -o /dev/null -H "Content-Type:application/json" -d @${DATA} ${HOST}/${URI} 2>&1 ; then
-	        echo -e "[fatal] cannot populate stub. \n\nMake sure 'vat-summary-frontend' is running with test only routes enabled"
-		exit 1
-	    fi
-	done
-
-	echo -e "[success] successfully populated stub"
+set_command() {
+  if ! is_command_set; then
+    echo -e "${1}"
+  fi
 }
 
-sub_log() {
-    if [ -f ${LOG_DIR}/${SVC}.log ]; then
-        cat ${LOG_DIR}/${SVC}.log
-    else
-        echo "[fatal] no log file found for '${SVC}'"
-    fi
+set_service() {
+  if ! is_service_set; then
+    echo -e "${1}"
+  fi
 }
 
 remove_log() {
-    echo -n "" > ${LOG_DIR}/$1.log
+  echo -n "" > ${prog_logs}/${1}.log
 }
 
-get_svcname() {
-    if [[ ${SVCS[*]} == *"$(basename $(pwd))"* ]]; then 
-	SVC=$(basename $(pwd))
-    else invalid_dir
-    fi
+set_service_name() {
+  local current_dir="$(basename $(pwd))"
+
+  if [[ ${services[*]} == *"${current_dir}"* ]]; then
+	  service="${current_dir}"
+  else
+    error "${err_invalid_dir}" "${current_dir}"
+  fi
 }
 
-no_argument() {
-    echo -e "[fatal] option '$1' requires an argument\n"
-    subcmd_usage
+error() {
+  printf "${1}" "${2}" >&2
+
+  if is_command "${2}"; then
+    command_usage
+  fi
+
+  prog_exit=1
+  exit ${prog_exit}
 }
 
-invalid_opt() {
-    echo -e "[fatal] unknown option '$1'\n"
-    subcmd_usage
+start_service() {
+  screen -c "${prog_conf}${1}".conf -dmSL ${1} ${2}
+
+  return ${?}
 }
 
-invalid_subcmd() {
-    echo -e "[fatal] '$1' is not a known command\n" >&2
-    echo -e "run '$PROGNAME --help' for a list of known commands." >&2
-    exit 1
+stop_service() {
+  screen -XS "${1}" quit > /dev/null
+
+  return ${?}
 }
 
-invalid_svc() {
-    echo "[fatal] '$1' is not a known service." >&2
-    exit 1
+service_running() {
+  screen -list | grep "${1}" > /dev/null
+
+  return ${?}
 }
 
-invalid_dir() {
-    echo "[fatal] '$(basename $(pwd))' is not a recognised microservice directory" >&2
-    exit 1
-}
+## main commands
 
-subcmd_usage() {
-    echo -e "${!SUBCMD}\n"
-    echo -e "Usage:"
-    echo -e "\t$PROGNAME $SUBCMD [options]"
-    echo -e "\t$PROGNAME $SUBCMD [microservice] [options]\n"
-    echo -e "Options:"
-    echo -e "\t-p, --port      Specify port to use"
-    echo -e "\t-a, --all       Use all services"
-    echo -e "\t-b, --branch    Specify a git branch"
-    echo -e "\t-h, --help      Show this screen\n"
-    echo -e "For help with each command run:"
-    echo -e "$PROGNAME <command> -h | --help\n"
-    exit 1
-}
+sub_start() {
+  #if [ -z "${service}" ] && [[ ${all} -eq 0 ]]; then
+  #  command_usage
+  #fi
 
-if [[ $# -eq 0 ]]; then usage; fi
-
-for pass in 1 2; do
-    while [ -n "$1" ]; do
-        case $1 in
-            --) shift; break;;
-            -*) case $1 in
-                -a|--all)       ALL=1 ;;
-		-t|--test-only) TEST_ONLY=1 ;;
-		-v|--version)   version ;;                
-		-b|--branch)    if [ ! -z "$2"        ]; then BRANCH=$2; CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD); else no_argument $1; fi; shift 	;;
-                -h|--help)      if [   -z "${SUBCMD}" ]; then usage ;    else subcmd_usage;   fi 	;;
-                -p|--port)      if [ ! -z "$2"        ]; then PORT=$2;   else no_argument $1; fi; shift 	;;
-                --*)            invalid_opt $1 ;;
-                -*)             if [ ${pass} -eq 1 ]; 	then ARGS="$ARGS $1";
-                                else invalid_opt $1 ; 	fi;;
-                esac;;
-                
-            *)  if   [[ ${SUBCMDS[*]} == *"$1"* ]]; 	then SUBCMD=$1
-                elif [[ ${SVCS[*]}    == *"$1"* ]]; 	then SVC=$1
-                elif [ -z "$SUBCMD" ];              	then invalid_subcmd $1
-                elif [ -z "$SVC"    ];              	then invalid_svc $1 
-                else invalid_opt $1 ; fi ;;
-
+  if [[ ${all} -eq 1 ]]; then
+    for service in "${services[@]}"; do
+      if ! service_running ${service} ; then
+        remove_log ${service}
+     
+        case ${service} in
+          "vat-summary-frontend")		   port=9152 ;;
+          "view-vat-returns-frontend") port=9151 ;;
         esac
-        shift
+
+        cd ${WORKSPACE}/${service}
+        if [ ! -z "${branch}" ] ; then
+          git checkout -q ${branch}
+    		fi
+		
+		    if [[ ${test_only} -eq 1 ]]; then
+          screen -c ${prog_conf}/${service}.conf -dmSL ${service} sbt "run -Dapplication.router=testOnly.Routes ${port}"
+		    else
+          screen -c ${prog_conf}/${service}.conf -dmSL ${service} sbt "run ${port}"
+    		fi
+      fi
     done
-    if [ ${pass} -eq 1 ]; then ARGS=`getopt ${opts} ${ARGS}`
-        if [ $? != 0 ];   then usage; exit 2; fi; set -- ${ARGS}
+
+    echo "${stat_success} all services started"
+
+    exit ${prog_exit}
+  fi
+
+  remove_log ${service}
+
+  if screen -list | grep ${service} > /dev/null; then
+    error "${err_already_running}" "${service}"
+  fi
+
+  if [ -z "${port}" ]; then
+    case ${service} in
+      "vat-summary-frontend")		   port=9152 ;;
+      "view-vat-returns-frontend") port=9151 ;;
+      *)	                         port=9000 ;;
+    esac
+  fi
+
+  cd ${WORKSPACE}/${service}
+  if [ ! -z "${branch}" ] ; then
+    git checkout -q ${branch}
+  fi
+
+  if [[ ${test_only} -eq 1 ]]; then
+    if screen -c ${prog_conf}/${service}.conf -dmSL ${service} sbt "run -Dapplication.router=testOnly.Routes ${port}"; then
+      echo "${stat_success} service '$service' started on port $port with test only routes"
+    else
+      error "${err_cannot_start_testonly}" "${service}"
     fi
-done
 
-if [ -z "$SVC" ] && [[ $SUBCMD =~ ^(start|stop|test|utest|itest|log|clean|compile)$ ]] && [[ $ALL -eq 0 ]]; then
-    get_svcname
+  else
+    if screen -c ${prog_conf}/${service}.conf -dmSL ${service} sbt "run ${port}"; then
+      echo "${stat_success} service '${service}' started on port ${port}"
+    else
+      error "${err_cannot_start}" "${service}"
+    fi
+  fi
+
+  if [ ! -z "${branch}" ] ; then
+    git checkout -q -
+  fi
+}
+  
+sub_stop() {
+  if [ -z "$service" ] && [[ $all -eq 0 ]]; then
+    command_usage
+  fi
+
+  if [[ ${all} -eq 1 ]]; then
+    for service in "${services[@]}"; do
+      if service_running ${service} ; then
+        stop_service ${service}
+      fi
+    done
+
+    echo "${stat_success} all services stopped"
+    exit ${prog_exit}
+  fi
+
+  if ! service_running ${service} ; then
+    error "${err_not_running}" "${service}"
+  fi
+
+  if stop_service ${service} ; then
+    echo "${stat_success} service '$service' stopped"
+  else
+    error "${err_cannot_stop}" "${service}"
+  fi
+}
+  
+sub_list() {
+  if [[ ${all} -eq 1 ]]; then
+    for service in "${services[@]}"; do
+	    remove_log ${service}
+
+      if service_running ${service}; then
+        status="active"
+      else
+        status="inactive"
+      fi
+            
+      cd ${WORKSPACE}/${service}
+      branch=$(git rev-parse --abbrev-ref HEAD)
+
+      printf "%-30s %-10s %s\n" ${service} ${status} ${branch}
+    done
+    
+  else
+    for service in "${services[@]}"; do
+      if service_running ${service}; then
+        status="active"
+ 
+        cd ${WORKSPACE}/${service}
+        branch=$(git rev-parse --abbrev-ref HEAD)
+
+        printf "%-30s %-10s %s\n" ${service} ${status} ${branch}
+      fi
+    done
+  fi
+}
+
+sub_utest() {
+	if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q ${branch}
+    fi
+
+    sbt test | grep info --color=never
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_itest() {
+  if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    sbt it:test | grep info --color=never
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_test() {
+	if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    sbt test it:test | grep info --color=never
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_clean() {
+  if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    if sbt clean > /dev/null; then
+	    echo "${stat_success} successfully cleaned '${service}'"
+    else
+      error ${err_cannot_clean} ${service}
+    fi
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_compile() {
+	if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    if sbt clean > /dev/null; then
+	    echo "${stat_success} successfully compiled '${service}'"
+    else
+      error ${err_cannot_compile} ${service}
+    fi
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_populate() {
+	stub_host="127.0.0.1:9152"
+	stub_uri="vat-through-software/test-only/populate-stub"
+
+	curl -s -o /dev/null -X "DELETE" ${stub_host}/vat-through-software/test-only/clear-stub 2>&1
+
+	for data in ${stub_data} ; do
+	  if ! curl -s -o /dev/null -H "Content-Type:application/json" -d @${data} ${stub_host}/${stub_uri} 2>&1; then
+	    error "${err_cannot_populate}" "vat-summary-frontend"
+	  fi
+	done
+
+	echo -e "${stat_success} successfully populated stub"
+}
+
+sub_log() {
+  if [ -f ${prog_logs}/${service}.log ]; then
+    cat ${prog_logs}/${service}.log
+  else
+	  error "${err_no_logfile}" "${service}"
+  fi
+}
+
+sub_update() {
+  cd ${prog_repo}
+
+  git fetch
+  if [[ $(git rev-parse HEAD) != $(git rev-parse @{u}) ]]; then
+    if git pull; then
+      echo "${stat_success} successfully updated to version $(cat VERSION)"
+      make update
+
+    else
+      error "${err_cannot_update}"
+    fi
+  fi
+
+  cd -
+}
+
+sub_tag() {
+  if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    git describe
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+sub_head() {
+  if cd ${WORKSPACE}/${service}; then
+    if [ ! -z "${branch}" ]; then
+      git checkout -q ${branch}
+    fi
+
+    git rev-parse --abbrev-ref HEAD
+
+    if [ ! -z "${branch}" ] ; then
+      git checkout -q -
+    fi
+
+  else
+    error "${err_invalid_service}" "${service}"
+  fi
+}
+
+## parse arguments and begin
+
+check_for_update
+
+if [[ ${#} -eq 0 ]]; then main_usage; fi
+
+while [ -n "${1}" ]; do
+  case "${1}" in
+    --) shift; break;;
+    -*) case "${1}" in
+      -a|--all)       all=1 ;;
+      -t|--test-only) test_only=1 ;;
+      -v|--version)   version ;;
+      -b|--branch)    if [ ! -z "${2}" ];   then branch="${2}" ; else error "${err_no_argument}" "${1}"; fi; shift ;;
+      -p|--port)      if [ ! -z "${2}" ];   then port="${2}"   ; else error "${err_no_argument}" "${1}"; fi; shift ;;
+      -h|--help)      if ! is_command_set;  then main_usage    ; else command_usage; fi ;;
+      -*)             error "${err_invalid_opt}" "${1}" ;;
+    esac ;;
+
+    *) if   is_command "${1}"; 	then command=$(set_command "${1}")
+       elif is_service "${1}"; 	then service=$(set_service "${1}")
+       elif ! is_command_set;   then error "${err_invalid_command}" "${1}"
+       elif ! is_service_set;   then error "${err_invalid_service}" "${1}"
+       else error "${err_invalid_opt}" "${1}"; fi ;;
+
+    esac
+    shift
+
+  done
+
+if ! is_service_set && [[ ${command} =~ ^(start|stop|test|utest|itest|log|clean|compile)$ ]] && [[ ${all} -eq 0 ]]; then
+  set_service_name
 fi
 
-if [ -z "$SUBCMD" ]; then
-    usage
+if ! is_command_set; then
+  main_usage
 fi
 
-sub_${SUBCMD}
-exit 0
+sub_${command}
 
+exit ${prog_exit}

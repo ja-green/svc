@@ -12,6 +12,8 @@ install: dep ## Install svc
 	    sudo chmod +x /usr/local/bin/svc;\
 	    sudo chmod +x /etc/bash_completion.d/svc_prompt;\
 	    cp -r .svc ${HOME};\
+	    cp UPDATE ${HOME}/.svc;\
+	    date +%D > ${HOME}/.svc/UPDATE;\
 	fi
 	
 dep: ## Get the dependencies
@@ -28,6 +30,8 @@ update: dep ## Overwrite svc install
 	@sudo chmod +x /usr/local/bin/svc
 	@sudo chmod +x /etc/bash_completion.d/svc_prompt
 	@cp -r .svc ${HOME}
+	@cp UPDATE ${HOME}/.svc
+	@date +%D > ${HOME}/.svc/UPDATE
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

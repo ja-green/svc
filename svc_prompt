@@ -1,56 +1,21 @@
-#_svc() 
-#{
-#    local cur prev opts base
-#    COMPREPLY=()
-#    cur="${COMP_WORDS[COMP_CWORD]}"
-#    prev="${COMP_WORDS[COMP_CWORD-1]}"
-#
-#    #
-#    #  The basic options we'll complete.
-#    #
-#    opts="start stop list populate utest itest test clean compile"
-#
-#
-#    #
-#    #  Complete the arguments to some of the basic commands.
-#    #
-#    case "${prev}" in
-#        start)
-#            local running=$(for x in `xm list --long | grep \(name | grep -v Domain-0 | awk '{ print $2 }' | tr -d \)`; do echo ${x} ; done )
-#            COMPREPLY=( $(compgen -W "${running}" -- ${cur}) )
-#            return 0
-#            ;;
-#        stop)
-#            local names=$(for x in `ls -1 /etc/xen/*.cfg`; do echo ${x/\/etc\/xen\//} ; done )
-#            COMPREPLY=( $(compgen -W "${names}" -- ${cur}) )
-#            return 0
-#            ;;
-#        *)
-#        ;;
-#    esac
-#
-#   COMPREPLY=($(compgen -W "${opts}" -- ${cur}))  
-#   return 0
-#}
-#complete -F _svc svc
-
 _svc()
 {
     local cur prev opts
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    curr="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    cmds="start stop list log populate utest itest test clean compile"
+    cmds="start stop list log test utest itest clean compile populate update tag head"
     opts="--help --all --port --branch --test-only"
     svcs="vat-summary-frontend view-vat-returns-frontend"
 
-    if [[ ${cur} == -* ]] ; then
-        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+    if [[ ${curr} == -* ]] ; then
+        COMPREPLY=($(compgen -W "${opts}" -- ${curr}))
         return 0
     elif [[ ${cmds} == *"${prev}"* ]] ; then
-        COMPREPLY=( $(compgen -W "${svcs}" -- ${cur}) )	 
+        COMPREPLY=($(compgen -W "${svcs}" -- ${curr}))
     else
-        COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
+        COMPREPLY=($(compgen -W "${cmds}" -- ${curr}))
     fi
 }
 complete -F _svc svc

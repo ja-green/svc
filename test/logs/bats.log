@@ -1,0 +1,166 @@
+test_no_arguments_and_not_in_directory
+    ----------
+    fatal: 'svc' is not a recognised microservice directory
+    ----------
+    
+test_no_arguments_and_in_directory
+    ----------
+    fatal: 'svc' is not a recognised microservice directory
+    ----------
+    
+test_short_help_argument
+    ----------
+    start running a microservice
+
+usage:   
+	svc  [options]   
+	svc  [microservice] [options]
+
+global options:   
+	-p, --port      specify port to use   
+	-a, --all       use all services   
+	-t, --test-only start service using test only routes   
+	-b, --branch    specify a git branch   
+	-h, --help      show this screen   
+	-v, --version   show version information
+
+for help with each command run:   
+	svc <command> -h | --help
+    ----------
+    
+test_long_help_argument
+    ----------
+    start running a microservice
+
+usage:   
+	svc  [options]   
+	svc  [microservice] [options]
+
+global options:   
+	-p, --port      specify port to use   
+	-a, --all       use all services   
+	-t, --test-only start service using test only routes   
+	-b, --branch    specify a git branch   
+	-h, --help      show this screen   
+	-v, --version   show version information
+
+for help with each command run:   
+	svc <command> -h | --help
+    ----------
+    
+test_with_arguments
+    ----------
+    warn: 'vat-summary-frontend' already running
+    ----------
+    
+test_no_arguments
+    ----------
+    svc v0.3.0
+
+manage the running and testing of HMRC VAT:VC microservices
+   
+usage:  
+	svc <command> [options]   
+	svc <command> [microservice] [options]   
+
+commands:                     
+	start           start running a microservice      
+	stop            stop a running microservice       
+	list            list microservices       
+	log             show service output        
+	populate        populate the services with data   
+	test            run unit and integration tests       
+	utest           run unit tests      
+	itest           run integration tests      
+	clean           clean microservice files      
+	tag             show the latest git tag        
+	head            show the current working branch       
+	compile         compile the microservice code    
+	update          update to the latest version of svc
+
+global options:   
+	-p, --port      specify port to use   
+	-a, --all       use all services   
+	-t, --test-only start service using test only routes   
+	-b, --branch    specify a git branch   
+	-h, --help      show this screen   
+	-v, --version   show version information
+
+for help with each command run:   
+	svc <command> -h | --help
+    ----------
+    
+test_short_help_argument
+    ----------
+    svc v0.3.0
+
+manage the running and testing of HMRC VAT:VC microservices
+   
+usage:  
+	svc <command> [options]   
+	svc <command> [microservice] [options]   
+
+commands:                     
+	start           start running a microservice      
+	stop            stop a running microservice       
+	list            list microservices       
+	log             show service output        
+	populate        populate the services with data   
+	test            run unit and integration tests       
+	utest           run unit tests      
+	itest           run integration tests      
+	clean           clean microservice files      
+	tag             show the latest git tag        
+	head            show the current working branch       
+	compile         compile the microservice code    
+	update          update to the latest version of svc
+
+global options:   
+	-p, --port      specify port to use   
+	-a, --all       use all services   
+	-t, --test-only start service using test only routes   
+	-b, --branch    specify a git branch   
+	-h, --help      show this screen   
+	-v, --version   show version information
+
+for help with each command run:   
+	svc <command> -h | --help
+    ----------
+    
+test_long_help_argument
+    ----------
+    svc v0.3.0
+
+manage the running and testing of HMRC VAT:VC microservices
+   
+usage:  
+	svc <command> [options]   
+	svc <command> [microservice] [options]   
+
+commands:                     
+	start           start running a microservice      
+	stop            stop a running microservice       
+	list            list microservices       
+	log             show service output        
+	populate        populate the services with data   
+	test            run unit and integration tests       
+	utest           run unit tests      
+	itest           run integration tests      
+	clean           clean microservice files      
+	tag             show the latest git tag        
+	head            show the current working branch       
+	compile         compile the microservice code    
+	update          update to the latest version of svc
+
+global options:   
+	-p, --port      specify port to use   
+	-a, --all       use all services   
+	-t, --test-only start service using test only routes   
+	-b, --branch    specify a git branch   
+	-h, --help      show this screen   
+	-v, --version   show version information
+
+for help with each command run:   
+	svc <command> -h | --help
+    ----------
+    
