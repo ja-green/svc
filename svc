@@ -524,9 +524,12 @@ sub_update() {
     else
       error "${err_cannot_update}"
     fi
+
+  else
+    echo "${stat_warn} nothing to update"
   fi
 
-  cd -
+  cd - >/dev/null
 }
 
 sub_tag() {
