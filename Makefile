@@ -1,5 +1,11 @@
-PROJECT_NAME := "svc"
-PROJECT_HOME := "$HOME/.svc"
+SHELL 	:= /bin/bash
+PROJECT  = svc
+DATE     = $(shell date +%D)
+P_HOME  := "$HOME/.svc"
+
+VERBOSE  = 0
+FILTER   = $(if $(filter 1,${VERBOSE},,@)
+GCC      = gcc
 
 .PHONY: all dep install update
 
@@ -7,26 +13,26 @@ all: help
 
 install: dep ## Install svc
 	@if ! hash svc 2>/dev/null ; then\
-	    sudo cp svc /usr/local/bin/;\
-	    sudo cp svc_prompt /etc/bash_completion.d/;\
+	    sudo cp legacy/svc /usr/local/bin/;\
+	    sudo cp legacy/svc_prompt /etc/bash_completion.d/;\
 	    sudo chmod +x /usr/local/bin/svc;\
 	    sudo chmod +x /etc/bash_completion.d/svc_prompt;\
 	    cp -r .svc ${HOME};\
 	    cp UPDATE ${HOME}/.svc;\
 	    date +%D > ${HOME}/.svc/UPDATE;\
 	fi
-	
+
 dep: ## Get the dependencies
 	@if ! hash screen 2>/dev/null ; then\
 	    sudo apt-get install screen;\
 	fi
 
 run: dep install ## Run svc
-	@svc
+	@./legacy/svc
 
 update: dep ## Overwrite svc install
-	@sudo cp svc /usr/local/bin/
-	@sudo cp svc_prompt /etc/bash_completion.d/
+	@sudo cp /legacy/svc /usr/local/bin/
+	@sudo cp /legacy/svc_prompt /etc/bash_completion.d/
 	@sudo chmod +x /usr/local/bin/svc
 	@sudo chmod +x /etc/bash_completion.d/svc_prompt
 	@cp -r .svc ${HOME}
