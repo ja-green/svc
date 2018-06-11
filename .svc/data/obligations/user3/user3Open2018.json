@@ -1,8 +1,0 @@
-{
-  "_id" : "/333333333/obligations?from=2018-01-01&to=2018-12-31&status=O",
-  "method" : "GET",
-  "status" : 200,
-  "response" : {
-    "obligations": []
-  }
-}
