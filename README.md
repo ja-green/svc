@@ -1,19 +1,10 @@
 # *svc*
 
-Tool for managing running and testing HMRC VAT:VC microservices
+Tool for managing, running and testing HMRC microservices
 
 ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-
-The program `screen` is needed for `svc` to run. Use `make dep` to install automatically or if you would like to do it manually:
-
-```bash
-$ sudo apt-get update
-$ sudo apt-get install screen
-```
 
 ### Installing
 
@@ -59,14 +50,8 @@ svc <subcommand> [microservice] [options]
 ```
 start             start inactive microservice(s)
 stop              stop active microservice(s)
-list              list microservice(s)
+status            list microservice(s)
 log               print service output
-test              run unit and integration tests
-utest             run unit tests
-itest             run integration tests
-clean             clean microservice files
-compile           compile the microservice code
-populate          populate the services with data
 ```
 
 ### Options
@@ -74,15 +59,12 @@ populate          populate the services with data
 ```
 -h, --help        display help screen for program / specific subcommand
 -p, --port        specify a port to run a microservice on
--t, --test-only   start a service with test only routes enabled
--a, --all         apply command to all available microservices
--b. --branch      specify a git branch
 -v, --version     show version information
 ```
 
 ### Examples
 
-Run `vat-summary-frontend` on it's default port:
+Run `vat-summary-frontend` on its default port:
 ```
 $ svc start vat-summary-frontend
 ```
@@ -92,24 +74,15 @@ Run `view-vat-returns-frontend` on port `1234`:
 $ svc start view-vat-returns-frontend -p 1234
 ```
 
-Stop all running microservies:
+Stop the `vat-summary-frontend` microservice:
 ```
-$ svc stop -a
-```
-
-List all microservices and their status:
-```
-$ svc list -a
+$ svc stop vat-summary-frontend
 ```
 
 List currently running microservices and their status:
 ```
-$ svc list
+$ svc status
 ```
-
-### Notes
-
-* Currently `svc` only supports `vat-summary-frontend` and `view-vat-returns-frontend`
 
 ## Contributing
 
