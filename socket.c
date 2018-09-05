@@ -11,7 +11,7 @@ struct output {
   size_t len;
 };
 
-static size_t writefn(void *ptr, size_t size, size_t nmemb, struct output *out) {
+static size_t fwritefn(void *ptr, size_t size, size_t nmemb, struct output *out) {
   size_t new_len = out->len + size * nmemb;
   out->ptr = realloc(out->ptr, new_len + 1);
 
@@ -38,7 +38,7 @@ static void init_output(struct output *out) {
   out->ptr[0] = '\0';
 }
 
-int socket_connect(const char *url, FILE *fp) {
+int socket_writef(const char *url, FILE *fp) {
   CURL  *curl;
   int   curl_response, http_response;
  
@@ -51,7 +51,7 @@ int socket_connect(const char *url, FILE *fp) {
     curl_easy_setopt(curl, CURLOPT_URL,            url);
     curl_easy_setopt(curl, CURLOPT_USERAGENT,      USERAGENT);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  writefn); 
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  fwritefn); 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA,      &out);
 
     curl_response = curl_easy_perform(curl);

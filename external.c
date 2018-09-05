@@ -20,6 +20,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 int fexists(const char *f, int pbits) {
   if (access(f, pbits) == 0) {
@@ -39,7 +42,7 @@ int get_from_path(const char *buf, const char *f) {
   return 0;
 }
 
-int execv_external(const char *f, const char *argv) {
+int execvs(const char *f, const char *argv) {
   int pid, status;
 
   pid = fork();
@@ -55,5 +58,30 @@ int execv_external(const char *f, const char *argv) {
     wait(&status);
 
     return status;
+  }
+}
+
+int execvb(const char *f, const char *argv, const char *service) {
+  int pid;
+  //char path[sizeof(service) + 16];
+
+  pid = fork();
+
+  if (pid == 0) {
+    //snprintf(path, sizeof(path), "%s%s", "/tmp/svc/active/", service);
+    int fd = open("/tmp/running_service", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+
+    dup2(fd, 1);
+    dup2(fd, 2);
+    close(fd); 
+
+    execvp(f, argv);
+    return EXIT_FAILURE;
+
+  } else if (pid == -1) {
+    return EXIT_FAILURE;
+    
+  } else {
+    return EXIT_SUCCESS;
   }
 }

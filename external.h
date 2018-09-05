@@ -5,6 +5,7 @@ int fexists(const char *f, int pbits);
 
 int get_from_path(const char *buf, const char *f);
 
-int execv_external(const char *f, const char *argv);
+int execvs(const char *f, const char *argv);
+int execvb(const char *f, const char *argv, const char *service);
 
 #endif /* EXTERNAL_H */

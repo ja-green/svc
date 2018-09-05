@@ -59,7 +59,7 @@ int cmd_help(int argc, const char **argv) {
 
   } else if (show_man == 1) {
     char *manargs[] = {"man", "svc", (char *) NULL};
-    execv_external("man", manargs);
+    execvs("man", manargs);
   }
 
   return EXIT_SUCCESS;

@@ -38,9 +38,9 @@ static const char *start_usage =
  \nsvc start [microservice] [options]";
 
 static struct option long_options[] = {
-  {"all",  no_argument, 	NULL, 	'a' },
-  {"help", no_argument, 	NULL, 	'h' },
-  {"man",  no_argument, 	NULL, 	'm' },
+  {"all",      no_argument, 	      NULL, 	'a' },
+  {"help",     no_argument, 	      NULL, 	'h' },
+  {"version",  required_argument, 	NULL, 	'v' },
 };
 
 static int verify_exists(const char *service) {
@@ -49,7 +49,7 @@ static int verify_exists(const char *service) {
 
   snprintf(url, sizeof url, "%s%s", GITHUB_URI, service);
 
-  response = socket_connect(url, NULL);
+  response = socket_writef(url, NULL);
 
   switch (response) {
     case HTTP_OK:   return EXIT_SUCCESS;
@@ -59,7 +59,7 @@ static int verify_exists(const char *service) {
 
 static int download_tgz(const char *service, const char *version) {
   char url[strlen(HMRC_BINT_URI) + strlen(service) + strlen(service) + strlen(version) + strlen(version) + 18];
-  char tgz[strlen(TEMP_DIR) + strlen(service) + strlen(version) + strlen(version) + 2];
+  char tgz[strlen(TEMP_DIR) + strlen(service) + strlen(version) + 2];
   int response;
   FILE *fp;
 
@@ -68,26 +68,20 @@ static int download_tgz(const char *service, const char *version) {
 
   mkdir(TEMP_DIR,  0755);
 
-  fp = fopen(tgz, "r");
-  if (fp != NULL) {
-    fclose(fp);
-    return EXIT_SUCCESS;
-  }
+  // finish rest of creating tgz file
 
   fp = fopen(tgz, "w");
 
-  // finish rest of creating tgz file
-
-  printf("%s\n", url);
-
-  response = socket_connect(url, fp);
+  if (socket_writef(url, fp) != 200) {
+    return EXIT_FAILURE;
+  }
 
   fclose(fp);
 
-  switch (response) {
-    case HTTP_OK:   return EXIT_SUCCESS;
-    default:        return response;
-  }
+  char *tarargs[] = {"tar", "-xzf", tgz, "-C", TEMP_DIR, (char *) NULL};
+  execvs("tar", tarargs);
+
+  return EXIT_SUCCESS;
 }
 
 static int run_service(const char *service) {
@@ -102,13 +96,14 @@ static int run_service(const char *service) {
 }
 
 int cmd_start(int argc, const char **argv) {
-  int c, show_hlp, exists;
-  char *version;
+  int c, show_hlp;
+  char version[8];
   const char *services[argc - optind];
 
-  while ((c = getopt_long(argc, argv, "ahm", long_options, NULL)) != -1) {
+  while ((c = getopt_long(argc, argv, "hv:", long_options, NULL)) != -1) {
     switch (c) {
-      case 'h':	show_hlp = 1; break;
+      case 'h':	show_hlp = 1;     break;
+      case 'v': snprintf(version, 16, "%s", optarg); break;
   	}	
   }
 
@@ -121,7 +116,9 @@ int cmd_start(int argc, const char **argv) {
   }
 
   for (int i = 0; i < argc - optind; i++) {
-    version = "0.139.0";
+    if (version == NULL) {
+      die("no version specified");
+    }
 
     if (download_tgz(services[i], version) != 0) {
       if (verify_exists(services[i]) != 0) {
@@ -130,6 +127,12 @@ int cmd_start(int argc, const char **argv) {
         die("failed to download source for '%s'", services[i]);
       }
     }
+
+    char bin[strlen(TEMP_DIR) + strlen(services[i]) + strlen(services[i]) + strlen(version) + 7];
+    snprintf(bin, sizeof(bin), "%s%s%s%s%s%s", TEMP_DIR, services[i], "-", version, "/bin/", services[i]);
+
+    char *bashargs[] = {"bash", bin, (char *) NULL};
+    execvb("bash", bashargs, services[i]);
   }
 
   return EXIT_SUCCESS;
